@@ -1,5 +1,7 @@
 package ee.merelaager.gossip
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
@@ -7,6 +9,7 @@ import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FolderShared
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -15,12 +18,17 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import ee.merelaager.gossip.data.network.ApiClient
+import ee.merelaager.gossip.data.repository.AuthRepository
+import ee.merelaager.gossip.ui.LoginScreen
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Home : Screen("home", "Kõlakad", Icons.Default.ChatBubble)
@@ -30,10 +38,30 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object Account : Screen("account", "Konto", Icons.Default.AccountCircle)
 }
 
+@Composable
+fun GossipApp(authViewModel: AuthViewModel = viewModel()) {
+    val authRepo = AuthRepository(ApiClient.authService)
+    when (val state = authViewModel.authState.value) {
+        is AuthState.Loading -> {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        }
+        is AuthState.Unauthenticated -> {
+            LoginScreen(onLoginSuccess = {
+                authViewModel.setAuthenticated()
+            }, authRepo)
+        }
+        is AuthState.Authenticated -> {
+            GossipMainApp() // your existing `Scaffold` + `NavHost` setup
+        }
+    }
+}
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GossipApp() {
+fun GossipMainApp() {
     val navController = rememberNavController()
     val navBackStackEntry = navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry.value?.destination?.route
