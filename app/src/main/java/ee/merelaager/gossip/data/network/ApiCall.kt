@@ -14,26 +14,29 @@ inline fun <reified S, reified F> parseJSendResponse(body: ResponseBody?): JSend
     val jsonStr = body.string()
     if (jsonStr.isEmpty()) return null
 
-    val json = Json.parseToJsonElement(jsonStr).jsonObject
+    val json = Json {
+        ignoreUnknownKeys = true
+    }
 
-    val statusElement = json["status"]?.jsonPrimitive
+    val jsObj = json.parseToJsonElement(jsonStr).jsonObject
+    val statusElement = jsObj["status"]?.jsonPrimitive
     val status = statusElement?.content ?: return null
 
     return when (status) {
         "success" -> {
-            val dataElement = json["data"] ?: return null
-            val data = Json.decodeFromJsonElement<S>(dataElement)
+            val dataElement = jsObj["data"] ?: return null
+            val data = json.decodeFromJsonElement<S>(dataElement)
             JSendResponse.Success(data)
         }
 
         "fail" -> {
-            val dataElement = json["data"] ?: return null
-            val data = Json.decodeFromJsonElement<F>(dataElement)
+            val dataElement = jsObj["data"] ?: return null
+            val data = json.decodeFromJsonElement<F>(dataElement)
             JSendResponse.Fail(data)
         }
 
         "error" -> {
-            val message = json["message"]?.jsonPrimitive?.content ?: "Unknown error"
+            val message = jsObj["message"]?.jsonPrimitive?.content ?: "Unknown error"
             JSendResponse.Error(message)
         }
 
@@ -55,64 +58,3 @@ suspend inline fun <reified S, reified F> executeJSendCall(
     val body = response.body()
     return parseJSendResponse<S, F>(body)
 }
-
-//suspend fun <SuccessT, FailT> apiCall(
-//    call: suspend () -> Response<String>,
-//    gson: Gson = Gson()
-//): NetworkResult<SuccessT?, FailT> {
-//    return try {
-//        val response = call()
-//
-//        if (response.isSuccessful) {
-//            val body = response.body()
-//            if (!body.isNullOrBlank()) {
-//                val jsend = gson.fromJson(body, JSendWrapper::class.java)
-//                when (jsend.status) {
-//                    "success" -> {
-//                        val data = gson.fromJson<SuccessT>(
-//                            gson.toJson(jsend.data),
-//                            successType
-//                        )
-//                        NetworkResult.Success(data)
-//                    }
-//
-//                    else -> {
-//                        val errorMessage = jsend.message ?: "Unexpected status: ${jsend.status}"
-//                        NetworkResult.Error(errorMessage, response.code())
-//                    }
-//                }
-//            } else {
-//                NetworkResult.Success(null)
-//            }
-//        } else {
-//            val errorBody = response.errorBody()?.string()
-//            if (!errorBody.isNullOrBlank()) {
-//                val jsend = gson.fromJson(errorBody, JSendWrapper::class.java)
-//                when (jsend.status) {
-//                    "fail" -> {
-//                        val data = gson.fromJson<FailT>(
-//                            gson.toJson(jsend.data),
-//                            failType
-//                        )
-//                        NetworkResult.Fail(data)
-//                    }
-//
-//                    "error" -> {
-//                        NetworkResult.Error(jsend.message ?: "Unknown error", jsend.code)
-//                    }
-//
-//                    else -> {
-//                        NetworkResult.Error(
-//                            "Unknown error status '${jsend.status}'",
-//                            response.code()
-//                        )
-//                    }
-//                }
-//            } else {
-//                NetworkResult.Error("Unknown error", response.code())
-//            }
-//        }
-//    } catch (ex: Exception) {
-//        NetworkResult.Exception(ex)
-//    }
-//}

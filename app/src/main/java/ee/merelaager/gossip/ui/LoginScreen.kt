@@ -16,8 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import ee.merelaager.gossip.data.network.ApiClient
-import ee.merelaager.gossip.data.network.LoginRequest
+import ee.merelaager.gossip.data.model.JSendResponse
 import ee.merelaager.gossip.data.repository.AuthRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -38,7 +37,12 @@ fun LoginScreen(onLoginSuccess: () -> Unit, authRepository: AuthRepository) {
         verticalArrangement = Arrangement.Center
     ) {
         TextField(value = username, onValueChange = { username = it }, label = { Text("Username") })
-        TextField(value = password, onValueChange = { password = it }, label = { Text("Password") }, visualTransformation = PasswordVisualTransformation())
+        TextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text("Password") },
+            visualTransformation = PasswordVisualTransformation()
+        )
 
         if (error != null) {
             Text(text = error!!, color = Color.Red)
@@ -50,12 +54,29 @@ fun LoginScreen(onLoginSuccess: () -> Unit, authRepository: AuthRepository) {
                 error = null
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
-                        // ApiClient.authService.login(LoginRequest(username, password))
-                        val res = authRepository.login(username, password)
-                        println(res)
-                        withContext(Dispatchers.Main) {
-                            loading = false
-                            onLoginSuccess()
+                        val response = authRepository.login(username, password)
+                        println(response)
+                        when (response) {
+                            is JSendResponse.Success -> {
+                                withContext(Dispatchers.Main) {
+                                    loading = false
+                                    onLoginSuccess()
+                                }
+                            }
+
+                            is JSendResponse.Fail -> {
+                                withContext(Dispatchers.Main) {
+                                    loading = false
+                                    error = response.data.message
+                                }
+                            }
+
+                            else -> {
+                                withContext(Dispatchers.Main) {
+                                    loading = false
+                                    error = "Login failed"
+                                }
+                            }
                         }
                     } catch (e: Exception) {
                         println(e)

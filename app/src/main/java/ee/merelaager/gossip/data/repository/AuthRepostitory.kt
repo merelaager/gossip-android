@@ -7,7 +7,7 @@ import ee.merelaager.gossip.data.network.executeJSendCall
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class LoginSuccess(val id: String, val username: String, val role: String)
+data class LoginSuccess(val username: String, val role: String)
 
 @Serializable
 data class AuthError(val message: String)
