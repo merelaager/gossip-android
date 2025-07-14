@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.FavoriteBorder
@@ -26,6 +27,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -52,7 +54,7 @@ fun PostsScreen(endpoint: String, postsRepo: PostsRepository, modifier: Modifier
     }
 
     when {
-        state.isLoading && state.posts.isEmpty() -> {
+        state.isLoadingInitial && state.posts.isEmpty() -> {
             Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
@@ -61,8 +63,11 @@ fun PostsScreen(endpoint: String, postsRepo: PostsRepository, modifier: Modifier
         else -> {
             RefreshablePostList(
                 items = state.posts,
-                isRefreshing = state.isLoading,
+                isLoadingInitial = state.isLoadingInitial,
+                isLoadingMore = state.isLoadingMore,
+                hasMore = state.hasMore,
                 onRefresh = { viewModel.loadPosts() },
+                onLoadMore = { viewModel.loadMorePosts() },
                 errorMessage = state.errorMessage,
                 modifier = modifier
             )
@@ -75,17 +80,34 @@ fun PostsScreen(endpoint: String, postsRepo: PostsRepository, modifier: Modifier
 @Composable
 fun RefreshablePostList(
     items: List<Post>,
-    isRefreshing: Boolean,
+    isLoadingInitial: Boolean,
+    isLoadingMore: Boolean,
+    hasMore: Boolean,
     onRefresh: () -> Unit,
+    onLoadMore: () -> Unit,
     errorMessage: String?,
     modifier: Modifier = Modifier
 ) {
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            val totalItems = listState.layoutInfo.totalItemsCount
+            lastVisible to totalItems
+        }.collect { (lastVisible, totalItems) ->
+            if (hasMore && !isLoadingMore && lastVisible >= totalItems - 5) {
+                onLoadMore()
+            }
+        }
+    }
+
     PullToRefreshBox(
-        isRefreshing = isRefreshing,
+        isRefreshing = isLoadingInitial,
         onRefresh = onRefresh,
         modifier = modifier.fillMaxSize()
     ) {
-        LazyColumn(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
             errorMessage?.let { message ->
                 item {
                     Box(
@@ -98,7 +120,7 @@ fun RefreshablePostList(
                 }
             }
 
-            if (items.isEmpty()) {
+            if (items.isEmpty() && !isLoadingInitial) {
                 item {
                     Box(
                         modifier = Modifier
@@ -123,6 +145,36 @@ fun RefreshablePostList(
                     }
                 }
             }
+
+            if (isLoadingMore) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+            }
+
+//            if (!hasMore && items.isNotEmpty()) {
+//                item {
+//                    Box(
+//                        modifier = Modifier
+//                            .fillMaxWidth()
+//                            .padding(16.dp),
+//                        contentAlignment = Alignment.Center
+//                    ) {
+//                        Text(
+//                            "Vanemaid postitusi pole.",
+//                            style = MaterialTheme.typography.bodySmall,
+//                            color = MaterialTheme.colorScheme.onSurfaceVariant
+//                        )
+//                    }
+//                }
+//            }
         }
     }
 }

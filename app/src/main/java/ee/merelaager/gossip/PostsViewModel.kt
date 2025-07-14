@@ -15,26 +15,84 @@ class PostsViewModel(
     private val endpoint: String
 ) : ViewModel() {
 
-    var postsState by mutableStateOf(PostsUiState(isLoading = true))
+    var postsState by mutableStateOf(PostsUiState(isLoadingInitial = true))
         private set
 
     fun loadPosts() {
         viewModelScope.launch {
-            postsState = postsState.copy(isLoading = true, errorMessage = null)
+            postsState = postsState.copy(isLoadingInitial = true, errorMessage = null)
             try {
                 val response = postsRepo.getPosts(endpoint, 1, 25)
-                postsState = when (response) {
-                    is JSendResponse.Success -> PostsUiState(posts = response.data.posts)
-                    is JSendResponse.Error -> postsState.copy(
-                        isLoading = false,
-                        errorMessage = response.message
-                    )
+                when (response) {
+                    is JSendResponse.Success -> {
+                        postsState = PostsUiState(
+                            posts = response.data.posts,
+                            currentPage = response.data.currentPage,
+                            totalPages = response.data.totalPages,
+                            isLoadingInitial = false
+                        )
+                    }
 
-                    else -> postsState.copy(isLoading = false, errorMessage = "Midagi läks nihu")
+                    is JSendResponse.Error -> {
+                        postsState = postsState.copy(
+                            isLoadingInitial = false,
+                            errorMessage = response.message
+                        )
+                    }
+
+                    else -> {
+                        postsState = postsState.copy(
+                            isLoadingInitial = false,
+                            errorMessage = "Midagi läks nihu"
+                        )
+                    }
                 }
             } catch (e: Exception) {
-                postsState =
-                    postsState.copy(isLoading = false, errorMessage = e.message ?: "Unknown error")
+                postsState = postsState.copy(
+                    isLoadingInitial = false,
+                    errorMessage = e.message ?: "Unknown error"
+                )
+            }
+        }
+    }
+
+    fun loadMorePosts() {
+        if (postsState.isLoadingMore || !postsState.hasMore) return
+
+        viewModelScope.launch {
+            postsState = postsState.copy(isLoadingMore = true, errorMessage = null)
+            try {
+                val nextPage = postsState.currentPage + 1
+                val response = postsRepo.getPosts(endpoint, nextPage, 25)
+                when (response) {
+                    is JSendResponse.Success -> {
+                        postsState = postsState.copy(
+                            posts = postsState.posts + response.data.posts,
+                            currentPage = response.data.currentPage,
+                            totalPages = response.data.totalPages,
+                            isLoadingMore = false
+                        )
+                    }
+
+                    is JSendResponse.Error -> {
+                        postsState = postsState.copy(
+                            isLoadingMore = false,
+                            errorMessage = response.message
+                        )
+                    }
+
+                    else -> {
+                        postsState = postsState.copy(
+                            isLoadingMore = false,
+                            errorMessage = "Midagi läks nihu"
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                postsState = postsState.copy(
+                    isLoadingMore = false,
+                    errorMessage = e.message ?: "Unknown error"
+                )
             }
         }
     }
@@ -42,6 +100,11 @@ class PostsViewModel(
 
 data class PostsUiState(
     val posts: List<Post> = emptyList(),
-    val isLoading: Boolean = false,
-    val errorMessage: String? = null
-)
+    val isLoadingInitial: Boolean = false,
+    val isLoadingMore: Boolean = false,
+    val errorMessage: String? = null,
+    val currentPage: Int = 1,
+    val totalPages: Int = 1
+) {
+    val hasMore: Boolean get() = currentPage < totalPages
+}
