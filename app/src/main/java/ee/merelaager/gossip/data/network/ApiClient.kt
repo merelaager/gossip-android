@@ -158,6 +158,7 @@ object ApiClient {
 
     private lateinit var retrofit: Retrofit
     private lateinit var authServiceInternal: AuthService
+    private lateinit var postsServiceInternal: PostsService
 
     fun init(context: Context) {
         val cookieJar = PersistentCookieJar(CookieStorage.cookieDataStore)
@@ -176,12 +177,19 @@ object ApiClient {
             .build()
 
         authServiceInternal = retrofit.create(AuthService::class.java)
+        postsServiceInternal = retrofit.create(PostsService::class.java)
     }
 
     val authService: AuthService
         get() {
             check(::authServiceInternal.isInitialized) { "ApiClient not initialized. Call ApiClient.init(context) first." }
             return authServiceInternal
+        }
+
+    val postsService: PostsService
+        get() {
+            check(::postsServiceInternal.isInitialized) { "ApiClient not initialized. Call ApiClient.init(context) first." }
+            return postsServiceInternal
         }
 
 }

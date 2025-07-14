@@ -3,10 +3,14 @@ package ee.merelaager.gossip
 import android.content.Context
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.ChatBubble
@@ -31,8 +35,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -41,6 +47,7 @@ import androidx.navigation.compose.rememberNavController
 import ee.merelaager.gossip.data.network.ApiClient
 import ee.merelaager.gossip.data.network.CookieStorage
 import ee.merelaager.gossip.data.repository.AuthRepository
+import ee.merelaager.gossip.data.repository.PostsRepository
 import ee.merelaager.gossip.ui.LoginScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -78,6 +85,8 @@ fun GossipApp(context: Context) {
         AuthViewModel(authRepo)
     }
 
+    val postsRepo = remember { PostsRepository(ApiClient.postsService) }
+
     when (authViewModel.authState.value) {
         is AuthState.Loading -> {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -92,7 +101,7 @@ fun GossipApp(context: Context) {
         }
 
         is AuthState.Authenticated -> {
-            GossipMainApp(authViewModel)
+            GossipMainApp(authViewModel, postsRepo)
         }
     }
 }
@@ -100,7 +109,7 @@ fun GossipApp(context: Context) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GossipMainApp(authViewModel: AuthViewModel) {
+fun GossipMainApp(authViewModel: AuthViewModel, postsRepo: PostsRepository) {
     val navController = rememberNavController()
     val navBackStackEntry = navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry.value?.destination?.route
@@ -135,7 +144,7 @@ fun GossipMainApp(authViewModel: AuthViewModel) {
             )
         }
     ) { innerPadding ->
-        GossipNavHost(navController, authViewModel, Modifier.padding(innerPadding))
+        GossipNavHost(navController, authViewModel, postsRepo, Modifier.padding(innerPadding))
     }
 }
 
@@ -168,6 +177,7 @@ fun GossipBottomNavigation(
 fun GossipNavHost(
     navController: NavHostController,
     authViewModel: AuthViewModel,
+    postsRepo: PostsRepository,
     modifier: Modifier = Modifier
 ) {
     NavHost(
@@ -175,17 +185,63 @@ fun GossipNavHost(
         startDestination = Screen.Home.route,
         modifier = modifier
     ) {
-        composable(Screen.Home.route) { PostsScreen("Kõlakad") }
-        composable(Screen.Liked.route) { PostsScreen("Kõva kumu") }
-        composable(Screen.Mine.route) { PostsScreen("Minu") }
-        composable(Screen.Waitlist.route) { PostsScreen("Ootel") }
+        composable(Screen.Home.route) { PostsScreen("Kõlakad", "", postsRepo) }
+        composable(Screen.Liked.route) { PostsScreen("Kõva kumu", "liked", postsRepo) }
+        composable(Screen.Mine.route) { PostsScreen("Minu", "my", postsRepo) }
+        composable(Screen.Waitlist.route) { PostsScreen("Ootel", "waitlist", postsRepo) }
         composable(Screen.Account.route) { AccountScreen(authViewModel) }
     }
 }
 
 @Composable
-fun PostsScreen(title: String) {
-    Text("Display $title")
+fun PostsScreen(title: String, endpoint: String, postsRepo: PostsRepository) {
+    val viewModel: PostsViewModel = remember(endpoint) {
+        PostsViewModel(postsRepo, endpoint)
+    }
+
+    val state = viewModel.postsState
+
+    LaunchedEffect(endpoint) {
+        viewModel.loadPosts()
+    }
+
+    when (state) {
+        is PostsUiState.Loading -> {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        }
+
+        is PostsUiState.Success -> {
+            LazyColumn(modifier = Modifier.fillMaxSize()) {
+                items(state.posts, key = { it.id }) { post ->
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(text = post.title)
+                        post.content?.let { Text(text = it) }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Favorite,
+                                contentDescription = "Like",
+                                tint = if (post.isLiked) Color.Red else Color.Gray
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "${post.likeCount}",
+                                color = if (post.isLiked) Color.Red else Color.Gray,
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        is PostsUiState.Error -> {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Error: ${state.message}")
+            }
+        }
+    }
 }
 
 @Composable
