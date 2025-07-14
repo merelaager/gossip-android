@@ -119,9 +119,9 @@ fun GossipMainApp(authViewModel: AuthViewModel, postsRepo: PostsRepository) {
             )
         },
         bottomBar = {
-            GossipBottomNavigation(
+            MainNavigationBar(
                 currentRoute = currentRoute,
-                onItemSelected = { screen ->
+                onDestinationSelected = { screen ->
                     navController.navigate(screen.route) {
                         popUpTo(navController.graph.startDestinationId) {
                             saveState = true
@@ -138,9 +138,9 @@ fun GossipMainApp(authViewModel: AuthViewModel, postsRepo: PostsRepository) {
 }
 
 @Composable
-fun GossipBottomNavigation(
+fun MainNavigationBar(
     currentRoute: String?,
-    onItemSelected: (Screen) -> Unit
+    onDestinationSelected: (Screen) -> Unit
 ) {
     val items = listOf(
         Screen.Home,
@@ -152,11 +152,12 @@ fun GossipBottomNavigation(
 
     NavigationBar {
         items.forEach { screen ->
+            val selected = currentRoute == screen.route
             NavigationBarItem(
+                selected = selected,
                 icon = { Icon(screen.icon, contentDescription = screen.label) },
                 label = { Text(screen.label) },
-                selected = currentRoute == screen.route,
-                onClick = { onItemSelected(screen) }
+                onClick = { onDestinationSelected(screen) }
             )
         }
     }
