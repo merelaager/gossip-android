@@ -38,6 +38,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import ee.merelaager.gossip.data.model.JSendResponse
 import ee.merelaager.gossip.data.repository.AuthRepository
+import ee.merelaager.gossip.ui.theme.GossipPink
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -54,8 +55,6 @@ fun LoginScreen(
     var error by remember { mutableStateOf<String?>(null) }
 
     val coroutineScope = rememberCoroutineScope()
-
-    val gossipPink = Color(0xFFFF2D55)
 
     Box(
         modifier = modifier
@@ -153,7 +152,7 @@ fun LoginScreen(
                     modifier = modifier
                         .fillMaxWidth()
                         .height(48.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = gossipPink),
+                    colors = ButtonDefaults.buttonColors(containerColor = GossipPink),
                 ) {
                     Text(
                         text = "Logi sisse",
