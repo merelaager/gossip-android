@@ -65,7 +65,7 @@ object CookieListSerializer : Serializer<List<SerializableCookie>> {
     override val defaultValue: List<SerializableCookie> = emptyList()
 
     override suspend fun readFrom(input: InputStream): List<SerializableCookie> {
-        println("READING COOKIES")
+        Log.d("readFrom", "READING COOKIES")
         return try {
             Json.decodeFromString(
                 deserializer = ListSerializer(SerializableCookie.serializer()),
@@ -77,8 +77,8 @@ object CookieListSerializer : Serializer<List<SerializableCookie>> {
     }
 
     override suspend fun writeTo(t: List<SerializableCookie>, output: OutputStream) {
-        println("Saving ${t.size} cookies")
-        println("Saved: ${t}")
+        Log.d("writeTo", "Saving ${t.size} cookies")
+        Log.d("writeTo", "Saved: ${t}")
         output.write(
             Json.encodeToString(
                 serializer = ListSerializer(SerializableCookie.serializer()),
@@ -107,7 +107,7 @@ class PersistentCookieJar(
     private val cookieDataStore: DataStore<List<SerializableCookie>>
 ) : CookieJar {
 
-    private val cookieStore = mutableMapOf<String, MutableList<Cookie>>()
+    private val cookieStore = mutableMapOf<String, Cookie>()
 
     init {
         CoroutineScope(Dispatchers.IO).launch {
@@ -116,28 +116,26 @@ class PersistentCookieJar(
     }
 
     override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
-        val host = url.host
-        val existing = cookieStore[host] ?: mutableListOf()
-
-        cookies.forEach { newCookie ->
-            existing.removeAll { oldCookie -> oldCookie.name == newCookie.name }
-            existing.add(newCookie)
+        Log.d("saveFromResponse", "SAVING COOKIES FROM REQUEST")
+        Log.d("saveFromResponse", "COOKIE STORE BEFORE: ${cookieStore}")
+        cookies.forEach { cookie ->
+            cookieStore[cookie.name] = cookie
         }
-        cookieStore[host] = existing
+        Log.d("saveFromResponse", "COOKIE STORE AFTER: ${cookieStore}")
+        Log.d("saveFromResponse", "SAVED COOKIES FROM REQUEST")
         persistCookies()
     }
 
     override fun loadForRequest(url: HttpUrl): List<Cookie> {
         val now = System.currentTimeMillis()
-        val validCookies = cookieStore.values.flatten().filter { it.expiresAt > now }
-        println("Loading all cookies, count: ${validCookies.size}")
-        println("Loading: ${validCookies}")
-        return validCookies
+        return cookieStore.values.filter {
+            it.expiresAt > now && it.matches(url)
+        }
     }
 
     private fun persistCookies() {
         CoroutineScope(Dispatchers.IO).launch {
-            val allCookies = cookieStore.values.flatten()
+            val allCookies = cookieStore.values
                 .filter { it.expiresAt > System.currentTimeMillis() }
                 .map { SerializableCookie.from(it) }
             cookieDataStore.updateData { allCookies }
@@ -145,15 +143,13 @@ class PersistentCookieJar(
     }
 
     suspend fun loadCookiesFromStorage() {
+        Log.d("loadCookiesFromStorage", "LOADING COOKIES FROM STORE")
         val stored = cookieDataStore.data.first()
-        val valid = stored.map { it.toOkHttpCookie() }
         cookieStore.clear()
-        for (cookie in valid) {
-            val list = cookieStore.getOrPut(cookie.domain) { mutableListOf() }
-            list.add(cookie)
+        for (cookie in stored.map { it.toOkHttpCookie() }) {
+            cookieStore[cookie.name] = cookie
         }
-        Log.d("PersistentCookieJar", "Loaded ${valid.size} cookies from DataStore")
-        println("Loaded: ${cookieStore}")
+        Log.d("loadCookiesFromStorage", "LOADED FROM STORE: ${cookieStore}")
     }
 }
 
@@ -164,12 +160,7 @@ object ApiClient {
     private lateinit var authServiceInternal: AuthService
 
     fun init(context: Context) {
-        println("CREATING COOKIE JAR")
         val cookieJar = PersistentCookieJar(CookieStorage.cookieDataStore)
-        CoroutineScope(Dispatchers.IO).launch {
-            cookieJar.loadCookiesFromStorage()
-            println("CREATED COOKIE JAR")
-        }
 
         val client = OkHttpClient.Builder()
             .cookieJar(cookieJar)
