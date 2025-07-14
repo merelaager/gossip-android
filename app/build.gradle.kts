@@ -83,4 +83,6 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-kotlinx-serialization:3.0.0")
     implementation("com.squareup.retrofit2:converter-gson:3.0.0")
     implementation("androidx.datastore:datastore:1.1.7")
+
+    implementation("androidx.compose.material3:material3:1.3.2")
 }

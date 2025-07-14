@@ -15,32 +15,33 @@ class PostsViewModel(
     private val endpoint: String
 ) : ViewModel() {
 
-    var postsState by mutableStateOf<PostsUiState>(PostsUiState.Loading)
+    var postsState by mutableStateOf(PostsUiState(isLoading = true))
         private set
-
-    init {
-        loadPosts()
-    }
 
     fun loadPosts() {
         viewModelScope.launch {
-            postsState = PostsUiState.Loading
+            postsState = postsState.copy(isLoading = true, errorMessage = null)
             try {
                 val response = postsRepo.getPosts(endpoint, 1, 25)
                 postsState = when (response) {
-                    is JSendResponse.Success -> PostsUiState.Success(response.data.posts)
-                    is JSendResponse.Error -> PostsUiState.Error(response.message)
-                    else -> PostsUiState.Error("Midagi läks nihu")
+                    is JSendResponse.Success -> PostsUiState(posts = response.data.posts)
+                    is JSendResponse.Error -> postsState.copy(
+                        isLoading = false,
+                        errorMessage = response.message
+                    )
+
+                    else -> postsState.copy(isLoading = false, errorMessage = "Midagi läks nihu")
                 }
             } catch (e: Exception) {
-                postsState = PostsUiState.Error(e.message ?: "Unknown error")
+                postsState =
+                    postsState.copy(isLoading = false, errorMessage = e.message ?: "Unknown error")
             }
         }
     }
 }
 
-sealed class PostsUiState {
-    object Loading : PostsUiState()
-    data class Success(val posts: List<Post>) : PostsUiState()
-    data class Error(val message: String) : PostsUiState()
-}
+data class PostsUiState(
+    val posts: List<Post> = emptyList(),
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null
+)
