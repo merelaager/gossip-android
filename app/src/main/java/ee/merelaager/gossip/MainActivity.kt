@@ -12,12 +12,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.compose.rememberNavController
+import ee.merelaager.gossip.data.network.ApiClient
+import ee.merelaager.gossip.data.network.CookieStorage
 import ee.merelaager.gossip.ui.theme.GossipTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        CookieStorage.init(this)
+        ApiClient.init(this)
         setContent {
             GossipTheme {
 //                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->

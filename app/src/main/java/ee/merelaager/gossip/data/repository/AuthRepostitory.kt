@@ -1,6 +1,7 @@
 package ee.merelaager.gossip.data.repository
 
 import ee.merelaager.gossip.data.model.JSendResponse
+import ee.merelaager.gossip.data.model.User
 import ee.merelaager.gossip.data.network.AuthService
 import ee.merelaager.gossip.data.network.LoginRequest
 import ee.merelaager.gossip.data.network.executeJSendCall
@@ -21,6 +22,13 @@ class AuthRepository(private val authService: AuthService) {
 
         return executeJSendCall<LoginSuccess, AuthError> {
             authService.login(request)
+        }
+    }
+
+    suspend fun identify(): JSendResponse<User, AuthError>? {
+        println("MAKING IDENTIFICATION REQUEST")
+        return executeJSendCall<User, AuthError> {
+            authService.getAccountInfo()
         }
     }
 }
