@@ -1,5 +1,6 @@
 package ee.merelaager.gossip
 
+import android.content.Context
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -22,20 +23,28 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import ee.merelaager.gossip.data.network.ApiClient
+import ee.merelaager.gossip.data.network.CookieStorage
 import ee.merelaager.gossip.data.repository.AuthRepository
 import ee.merelaager.gossip.ui.LoginScreen
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Home : Screen("home", "Kõlakad", Icons.Default.ChatBubble)
@@ -46,12 +55,30 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
 }
 
 @Composable
-fun GossipApp() {
+fun GossipApp(context: Context) {
+    var isInitialised by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            CookieStorage.init(context)
+            ApiClient.init(context)
+        }
+        isInitialised = true
+    }
+
+    if (!isInitialised) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+
     val authRepo = remember { AuthRepository(ApiClient.authService) }
     val authViewModel = remember {
         AuthViewModel(authRepo)
     }
-    when (val state = authViewModel.authState.value) {
+
+    when (authViewModel.authState.value) {
         is AuthState.Loading -> {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
@@ -78,14 +105,6 @@ fun GossipMainApp(authViewModel: AuthViewModel) {
     val navBackStackEntry = navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry.value?.destination?.route
 
-    val items = listOf(
-        Screen.Home,
-        Screen.Liked,
-        Screen.Mine,
-        Screen.Waitlist,
-        Screen.Account
-    )
-
     val title = when (currentRoute) {
         Screen.Home.route -> Screen.Home.label
         Screen.Liked.route -> Screen.Liked.label
@@ -102,37 +121,65 @@ fun GossipMainApp(authViewModel: AuthViewModel) {
             )
         },
         bottomBar = {
-            NavigationBar {
-                items.forEach { screen ->
-                    NavigationBarItem(
-                        icon = { Icon(screen.icon, contentDescription = screen.label) },
-                        label = { Text(screen.label) },
-                        selected = currentRoute == screen.route,
-                        onClick = {
-                            navController.navigate(screen.route) {
-                                popUpTo(navController.graph.startDestinationId) {
-                                    saveState = true
-                                }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
+            GossipBottomNavigation(
+                currentRoute = currentRoute,
+                onItemSelected = { screen ->
+                    navController.navigate(screen.route) {
+                        popUpTo(navController.graph.startDestinationId) {
+                            saveState = true
                         }
-                    )
+                        launchSingleTop = true
+                        restoreState = true
+                    }
                 }
-            }
+            )
         }
     ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = Screen.Home.route,
-            modifier = Modifier.padding(innerPadding)
-        ) {
-            composable(Screen.Home.route) { PostsScreen("Kõlakad") }
-            composable(Screen.Liked.route) { PostsScreen("Kõva kumu") }
-            composable(Screen.Mine.route) { PostsScreen("Minu") }
-            composable(Screen.Waitlist.route) { PostsScreen("Ootel") }
-            composable(Screen.Account.route) { AccountScreen(authViewModel) }
+        GossipNavHost(navController, authViewModel, Modifier.padding(innerPadding))
+    }
+}
+
+@Composable
+fun GossipBottomNavigation(
+    currentRoute: String?,
+    onItemSelected: (Screen) -> Unit
+) {
+    val items = listOf(
+        Screen.Home,
+        Screen.Liked,
+        Screen.Mine,
+        Screen.Waitlist,
+        Screen.Account
+    )
+
+    NavigationBar {
+        items.forEach { screen ->
+            NavigationBarItem(
+                icon = { Icon(screen.icon, contentDescription = screen.label) },
+                label = { Text(screen.label) },
+                selected = currentRoute == screen.route,
+                onClick = { onItemSelected(screen) }
+            )
         }
+    }
+}
+
+@Composable
+fun GossipNavHost(
+    navController: NavHostController,
+    authViewModel: AuthViewModel,
+    modifier: Modifier = Modifier
+) {
+    NavHost(
+        navController = navController,
+        startDestination = Screen.Home.route,
+        modifier = modifier
+    ) {
+        composable(Screen.Home.route) { PostsScreen("Kõlakad") }
+        composable(Screen.Liked.route) { PostsScreen("Kõva kumu") }
+        composable(Screen.Mine.route) { PostsScreen("Minu") }
+        composable(Screen.Waitlist.route) { PostsScreen("Ootel") }
+        composable(Screen.Account.route) { AccountScreen(authViewModel) }
     }
 }
 
@@ -153,7 +200,7 @@ fun AccountScreen(authViewModel: AuthViewModel) {
                 authViewModel.logout()
             }
         }) {
-            Text("Delete All Cookies")
+            Text("Logi välja")
         }
     }
 }

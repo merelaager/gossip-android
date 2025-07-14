@@ -8,8 +8,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
-import ee.merelaager.gossip.data.network.ApiClient
-import ee.merelaager.gossip.data.network.CookieStorage
 import ee.merelaager.gossip.ui.theme.GossipTheme
 
 class MainActivity : ComponentActivity() {
@@ -17,12 +15,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        CookieStorage.init(this)
-        ApiClient.init(this)
-
         setContent {
             GossipTheme {
-                GossipApp()
+                GossipApp(this)
             }
         }
     }
