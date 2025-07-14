@@ -30,13 +30,11 @@ import ee.merelaager.gossip.PostsViewModel
 import ee.merelaager.gossip.data.model.Post
 import ee.merelaager.gossip.data.repository.PostsRepository
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PostsScreen(endpoint: String, postsRepo: PostsRepository) {
+fun PostsScreen(endpoint: String, postsRepo: PostsRepository, modifier: Modifier = Modifier) {
     val viewModel: PostsViewModel = remember(endpoint) {
         PostsViewModel(postsRepo, endpoint)
     }
-
     val state = viewModel.postsState
 
     LaunchedEffect(endpoint) {
@@ -44,33 +42,24 @@ fun PostsScreen(endpoint: String, postsRepo: PostsRepository) {
     }
 
     when {
-        state.posts.isEmpty() && state.isLoading -> {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        state.isLoading && state.posts.isEmpty() -> {
+            Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
         }
 
-        state.posts.isNotEmpty() -> {
+        else -> {
             RefreshablePostList(
                 items = state.posts,
                 isRefreshing = state.isLoading,
-                onRefresh = { viewModel.loadPosts() }
+                onRefresh = { viewModel.loadPosts() },
+                errorMessage = state.errorMessage,
+                modifier = modifier
             )
-
-            state.errorMessage?.let { error ->
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Text("Error: $error", color = Color.Red)
-                }
-            }
-        }
-
-        state.errorMessage != null -> {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Error: ${state.errorMessage}")
-            }
         }
     }
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,24 +67,52 @@ fun RefreshablePostList(
     items: List<Post>,
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
+    errorMessage: String?,
     modifier: Modifier = Modifier
 ) {
     PullToRefreshBox(
         isRefreshing = isRefreshing,
         onRefresh = onRefresh,
-        modifier = modifier
+        modifier = modifier.fillMaxSize()
     ) {
-        LazyColumn(Modifier.fillMaxSize()) {
-            items(items) { post ->
-                ListPost(post)
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
+            errorMessage?.let { message ->
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp)
+                    ) {
+                        Text("Viga: $message", color = Color.Red)
+                    }
+                }
+            }
+
+            if (items.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillParentMaxSize()
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("Postitusi pole.")
+                        }
+                    }
+                }
+            } else {
+                items(items) { post ->
+                    ListPost(post, modifier.fillMaxWidth())
+                }
             }
         }
     }
 }
 
 @Composable
-fun ListPost(post: Post) {
-    Column(modifier = Modifier.padding(16.dp)) {
+fun ListPost(post: Post, modifier: Modifier = Modifier) {
+    Column(modifier = modifier.padding(16.dp)) {
         Text(text = post.title)
         post.content?.let { Text(text = it) }
         Row(verticalAlignment = Alignment.CenterVertically) {
