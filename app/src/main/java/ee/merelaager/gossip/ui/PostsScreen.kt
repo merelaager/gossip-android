@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.FavoriteBorder
@@ -24,17 +22,25 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.paging.LoadState
+import androidx.paging.compose.LazyPagingItems
+import androidx.paging.compose.collectAsLazyPagingItems
 import ee.merelaager.gossip.PostsViewModel
+import ee.merelaager.gossip.PostsViewModelFactory
 import ee.merelaager.gossip.data.model.Post
 import ee.merelaager.gossip.data.repository.PostsRepository
 import ee.merelaager.gossip.ui.theme.GossipPink
@@ -44,83 +50,55 @@ import java.time.format.DateTimeFormatter
 
 @Composable
 fun PostsScreen(endpoint: String, postsRepo: PostsRepository, modifier: Modifier = Modifier) {
-    val viewModel: PostsViewModel = remember(endpoint) {
-        PostsViewModel(postsRepo, endpoint)
+    val factory = remember(endpoint, postsRepo) {
+        PostsViewModelFactory(postsRepo, endpoint)
     }
-    val state = viewModel.postsState
+    val viewModel: PostsViewModel = viewModel(factory = factory)
+    val pagingItems: LazyPagingItems<Post> = viewModel.postsFlow.collectAsLazyPagingItems()
 
-    LaunchedEffect(endpoint) {
-        viewModel.loadPosts()
-    }
+    val isInitialLoading = pagingItems.loadState.refresh is LoadState.Loading
+    val isEmpty = pagingItems.itemCount == 0
 
-    when {
-        state.isLoadingInitial && state.posts.isEmpty() -> {
-            Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
+
+    if (isInitialLoading && isEmpty) {
+        Box(
+            modifier = modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator()
         }
-
-        else -> {
-            RefreshablePostList(
-                items = state.posts,
-                isLoadingInitial = state.isLoadingInitial,
-                isLoadingMore = state.isLoadingMore,
-                hasMore = state.hasMore,
-                onRefresh = { viewModel.loadPosts() },
-                onLoadMore = { viewModel.loadMorePosts() },
-                errorMessage = state.errorMessage,
-                modifier = modifier
-            )
-        }
+    } else {
+        PostsPagingList(pagingItems, modifier)
     }
 }
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RefreshablePostList(
-    items: List<Post>,
-    isLoadingInitial: Boolean,
-    isLoadingMore: Boolean,
-    hasMore: Boolean,
-    onRefresh: () -> Unit,
-    onLoadMore: () -> Unit,
-    errorMessage: String?,
+fun PostsPagingList(
+    posts: LazyPagingItems<Post>,
     modifier: Modifier = Modifier
 ) {
-    val listState = rememberLazyListState()
+    // https://stackoverflow.com/a/79599377
+    var isRefreshing by remember { mutableStateOf(false) }
+    val pullToRefreshState = rememberPullToRefreshState()
 
-    LaunchedEffect(listState) {
-        snapshotFlow {
-            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            val totalItems = listState.layoutInfo.totalItemsCount
-            lastVisible to totalItems
-        }.collect { (lastVisible, totalItems) ->
-            if (hasMore && !isLoadingMore && lastVisible >= totalItems - 5) {
-                onLoadMore()
-            }
-        }
+    val onRefresh: () -> Unit = {
+        isRefreshing = true
+        posts.refresh()
+    }
+
+    val isLoading = posts.loadState.refresh is LoadState.Loading
+    LaunchedEffect(isLoading) {
+        isRefreshing = isRefreshing && isLoading
     }
 
     PullToRefreshBox(
-        isRefreshing = isLoadingInitial,
+        isRefreshing = isRefreshing,
         onRefresh = onRefresh,
-        modifier = modifier.fillMaxSize()
+        state = pullToRefreshState
     ) {
-        LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-            errorMessage?.let { message ->
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp)
-                    ) {
-                        Text("Viga: $message", color = Color.Red)
-                    }
-                }
-            }
-
-            if (items.isEmpty() && !isLoadingInitial) {
+        LazyColumn(modifier = modifier) {
+            if (posts.itemCount == 0 && !isLoading) {
                 item {
                     Box(
                         modifier = Modifier
@@ -134,47 +112,49 @@ fun RefreshablePostList(
                     }
                 }
             } else {
-                itemsIndexed(items) { index, post ->
-                    ListPost(post, modifier.fillMaxWidth())
+                items(posts.itemCount) { index ->
+                    posts[index]?.let { post ->
+                        Column {
+                            ListPost(post, Modifier.fillMaxWidth())
 
-                    if (index < items.lastIndex) {
-                        HorizontalDivider(
-                            thickness = 0.5.dp,
-                            color = if (isSystemInDarkTheme()) Color.White.copy(alpha = 0.2f) else Color.DarkGray
-                        )
+                            if (index < posts.itemCount) {
+                                HorizontalDivider(
+                                    thickness = 0.5.dp,
+                                    color = if (isSystemInDarkTheme()) Color.White.copy(alpha = 0.2f) else Color.DarkGray
+                                )
+                            }
+                        }
                     }
                 }
             }
 
-            if (isLoadingMore) {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
+            when {
+                posts.loadState.append == LoadState.Loading -> {
+                    item {
+                        CircularProgressIndicator(modifier = Modifier.padding(16.dp))
                     }
                 }
-            }
 
-//            if (!hasMore && items.isNotEmpty()) {
-//                item {
-//                    Box(
-//                        modifier = Modifier
-//                            .fillMaxWidth()
-//                            .padding(16.dp),
-//                        contentAlignment = Alignment.Center
-//                    ) {
-//                        Text(
-//                            "Vanemaid postitusi pole.",
-//                            style = MaterialTheme.typography.bodySmall,
-//                            color = MaterialTheme.colorScheme.onSurfaceVariant
-//                        )
+//                posts.loadState.refresh == LoadState.Loading -> {
+//                    if (posts.itemCount != 0) {
+//                        isRefreshing = true
 //                    }
 //                }
-//            }
+
+                posts.loadState.append is LoadState.Error -> {
+                    val e = posts.loadState.append as LoadState.Error
+                    item {
+                        Text("Error loading more: ${e.error.localizedMessage}")
+                    }
+                }
+
+                posts.loadState.refresh is LoadState.Error -> {
+                    val e = posts.loadState.refresh as LoadState.Error
+                    item {
+                        Text("Error loading: ${e.error.localizedMessage}")
+                    }
+                }
+            }
         }
     }
 }

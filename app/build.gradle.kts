@@ -85,4 +85,7 @@ dependencies {
     implementation("androidx.datastore:datastore:1.1.7")
 
     implementation("androidx.compose.material3:material3:1.3.2")
+
+    implementation("androidx.paging:paging-runtime:3.3.6")
+    implementation("androidx.paging:paging-compose:3.4.0-alpha01")
 }

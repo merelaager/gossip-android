@@ -1,9 +1,14 @@
 package ee.merelaager.gossip.data.repository
 
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
+import ee.merelaager.gossip.PostsPagingSource
 import ee.merelaager.gossip.data.model.JSendResponse
 import ee.merelaager.gossip.data.model.Post
 import ee.merelaager.gossip.data.network.PostsService
 import ee.merelaager.gossip.data.network.executeJSendCall
+import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -21,5 +26,15 @@ class PostsRepository(private val postsService: PostsService) {
         return executeJSendCall<PostsResponse, PostsError> {
             postsService.getPosts(endpoint, page, limit)
         }
+    }
+
+    fun getPostsPager(endpoint: String): Flow<PagingData<Post>> {
+        return Pager(
+            config = PagingConfig(
+                pageSize = 25,
+                enablePlaceholders = false
+            ),
+            pagingSourceFactory = { PostsPagingSource(this, endpoint) }
+        ).flow
     }
 }
