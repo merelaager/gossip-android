@@ -1,5 +1,6 @@
 package ee.merelaager.gossip.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,11 +37,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import ee.merelaager.gossip.PostsViewModel
 import ee.merelaager.gossip.PostsViewModelFactory
+import ee.merelaager.gossip.Screen
 import ee.merelaager.gossip.data.model.Post
 import ee.merelaager.gossip.data.repository.PostsRepository
 import ee.merelaager.gossip.ui.theme.GossipPink
@@ -49,7 +52,12 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
 @Composable
-fun PostsScreen(endpoint: String, postsRepo: PostsRepository, modifier: Modifier = Modifier) {
+fun PostsScreen(
+    endpoint: String,
+    postsRepo: PostsRepository,
+    navController: NavHostController,
+    modifier: Modifier = Modifier
+) {
     val factory = remember(endpoint, postsRepo) {
         PostsViewModelFactory(postsRepo, endpoint)
     }
@@ -68,7 +76,7 @@ fun PostsScreen(endpoint: String, postsRepo: PostsRepository, modifier: Modifier
             CircularProgressIndicator()
         }
     } else {
-        PostsPagingList(pagingItems, modifier)
+        PostsPagingList(pagingItems, navController, modifier)
     }
 }
 
@@ -76,8 +84,12 @@ fun PostsScreen(endpoint: String, postsRepo: PostsRepository, modifier: Modifier
 @Composable
 fun PostsPagingList(
     posts: LazyPagingItems<Post>,
+    navController: NavHostController,
     modifier: Modifier = Modifier
 ) {
+    val navBackStackEntry = navController.currentBackStackEntry
+    val currentRoute = navBackStackEntry?.destination?.route ?: Screen.Home.route
+
     // https://stackoverflow.com/a/79599377
     var isRefreshing by remember { mutableStateOf(false) }
     val pullToRefreshState = rememberPullToRefreshState()
@@ -115,7 +127,9 @@ fun PostsPagingList(
                 items(posts.itemCount) { index ->
                     posts[index]?.let { post ->
                         Column {
-                            ListPost(post, Modifier.fillMaxWidth())
+                            ListPost(post, Modifier.fillMaxWidth()) {
+                                navController.navigate("post/${post.id}?from=$currentRoute")
+                            }
 
                             if (index < posts.itemCount) {
                                 HorizontalDivider(
@@ -160,9 +174,10 @@ fun PostsPagingList(
 }
 
 @Composable
-fun ListPost(post: Post, modifier: Modifier = Modifier) {
+fun ListPost(post: Post, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Column(
         modifier = modifier
+            .clickable { onClick() }
             .padding(horizontal = 16.dp)
             .padding(top = 4.dp)
             .padding(bottom = 8.dp)

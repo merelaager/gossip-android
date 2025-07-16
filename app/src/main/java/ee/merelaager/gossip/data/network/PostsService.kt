@@ -7,6 +7,9 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface PostsService {
+    @GET("/posts/{id}")
+    suspend fun getPost(@Path("id") id: String): Response<ResponseBody>
+
     @GET("/posts/{endpoint}")
     suspend fun getPosts(
         @Path("endpoint") endpoint: String,

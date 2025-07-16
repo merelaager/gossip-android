@@ -17,6 +17,12 @@ data class PostsResponse(val posts: List<Post>, val currentPage: Int, val totalP
 @Serializable
 data class PostsError(val message: String)
 
+@Serializable
+data class PostResponse(val post: Post)
+
+@Serializable
+data class PostError(val message: String)
+
 class PostsRepository(private val postsService: PostsService) {
     suspend fun getPosts(
         endpoint: String,
@@ -25,6 +31,12 @@ class PostsRepository(private val postsService: PostsService) {
     ): JSendResponse<PostsResponse, PostsError>? {
         return executeJSendCall<PostsResponse, PostsError> {
             postsService.getPosts(endpoint, page, limit)
+        }
+    }
+
+    suspend fun getPostById(postId: String): JSendResponse<PostResponse, PostError>? {
+        return executeJSendCall<PostResponse, PostError> {
+            postsService.getPost(postId)
         }
     }
 
