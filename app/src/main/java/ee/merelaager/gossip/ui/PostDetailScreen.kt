@@ -3,6 +3,7 @@ package ee.merelaager.gossip.ui
 import android.content.Context
 import android.content.ContextWrapper
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,11 +12,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -27,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -37,6 +44,7 @@ import ee.merelaager.gossip.data.model.JSendResponse
 import ee.merelaager.gossip.data.model.Post
 import ee.merelaager.gossip.data.repository.PostsRepository
 import ee.merelaager.gossip.ui.theme.GossipPink
+import ee.merelaager.gossip.util.formatCreatedAt
 
 fun Context.findActivity(): ComponentActivity? = when (this) {
     is ComponentActivity -> this
@@ -77,41 +85,91 @@ fun PostDetailScreen(postId: String, postsRepo: PostsRepository) {
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        when {
-            isLoading -> CircularProgressIndicator()
-            error != null -> Text("Viga: $error")
-            post != null -> Post(post!!, Modifier.fillMaxWidth())
+    when {
+        isLoading -> {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        }
+
+        error != null -> {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = "Viga: $error")
+            }
+        }
+
+        post != null -> {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Post(post!!)
+            }
         }
     }
 }
 
 @Composable
-fun Post(post: Post, modifier: Modifier = Modifier) {
+fun Post(post: Post) {
     Column(
-        modifier = modifier
-            .padding(horizontal = 16.dp)
-            .padding(top = 4.dp)
-            .padding(bottom = 8.dp)
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(text = post.title, fontWeight = FontWeight.Medium)
-            Spacer(modifier = Modifier.width(4.dp))
+        Column(
+            modifier = Modifier.padding(vertical = 4.dp)
+        ) {
+            Text(text = post.title, fontWeight = FontWeight.Medium, fontSize = 22.sp)
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = formatCreatedAt(post.createdAt),
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.Gray,
             )
         }
-        post.content?.let { Text(text = it) }
-        post.imageId?.let { imageId ->
-            AsyncImage(
-                model = "https://merelaager.b-cdn.net/gossip/$imageId",
-                contentDescription = "Post image",
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (!post.published) {
+            val lineColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 8.dp)
-            )
+            ) {
+                HorizontalDivider(thickness = 1.dp, color = lineColor)
+                Text(
+                    text = "Postitus on ootel. Admin peab selle kinnitama.",
+                    color = GossipPink,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                HorizontalDivider(thickness = 1.dp, color = lineColor)
+            }
+        }
+
+        post.content?.let { Text(text = it) }
+        post.imageId?.let { imageId ->
+            Box(
+                modifier = Modifier
+                    .padding(vertical = 8.dp)
+                    .fillMaxWidth()
+                    .wrapContentWidth(Alignment.CenterHorizontally)
+            ) {
+                AsyncImage(
+                    model = "https://merelaager.b-cdn.net/gossip/$imageId",
+                    contentDescription = "Post image",
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(4.dp))
