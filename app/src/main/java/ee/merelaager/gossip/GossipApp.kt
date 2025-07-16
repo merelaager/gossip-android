@@ -6,10 +6,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Assignment
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Assignment
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FolderShared
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Task
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.FolderShared
 import androidx.compose.material.icons.outlined.PendingActions
+import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.rounded.ChatBubbleOutline
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,12 +55,37 @@ import ee.merelaager.gossip.ui.PostsScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
-    object Home : Screen("home", "Kõlakad", Icons.Rounded.ChatBubbleOutline)
-    object Liked : Screen("liked", "Kõva kumu", Icons.Outlined.FavoriteBorder)
-    object Mine : Screen("mine", "Minu", Icons.Outlined.FolderShared)
-    object Waitlist : Screen("waitlist", "Ootel", Icons.Outlined.PendingActions)
-    object Account : Screen("account", "Konto", Icons.Outlined.AccountCircle)
+sealed class Screen(
+    val route: String,
+    val label: String,
+    val filledIcon: ImageVector,
+    val outlinedIcon: ImageVector
+) {
+    object Home : Screen(
+        "home", "Kõlakad",
+        Icons.Rounded.ChatBubble, Icons.Rounded.ChatBubbleOutline
+    )
+
+    object Liked : Screen(
+        "liked", "Kõva kumu",
+        Icons.Filled.Favorite, Icons.Outlined.FavoriteBorder
+    )
+
+    object Mine : Screen(
+        "mine", "Minu",
+        Icons.Filled.FolderShared, Icons.Outlined.FolderShared
+    )
+
+    object Waitlist : Screen(
+        "waitlist", "Ootel",
+        // Sadly no filled variant of the pending actions.
+        Icons.AutoMirrored.Filled.Assignment, Icons.Outlined.PendingActions
+    )
+
+    object Account : Screen(
+        "account", "Konto",
+        Icons.Filled.AccountCircle, Icons.Outlined.AccountCircle
+    )
 }
 
 @Composable
@@ -185,7 +218,12 @@ fun MainNavigationBar(
             val selected = currentRoute == screen.route
             NavigationBarItem(
                 selected = selected,
-                icon = { Icon(screen.icon, contentDescription = screen.label) },
+                icon = {
+                    Icon(
+                        imageVector = if (selected) screen.filledIcon else screen.outlinedIcon,
+                        contentDescription = screen.label
+                    )
+                },
                 label = { Text(screen.label) },
                 onClick = { onDestinationSelected(screen) }
             )
